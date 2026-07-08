@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
 
 export async function GET(request: Request) {
     try {
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
             params.push(term_id);
         }
 
-        const [rows] = await pool.query<RowDataPacket[]>(query, params);
+        const [rows] = await pool.query(query, params);
         return NextResponse.json(rows);
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch schedules' }, { status: 500 });
@@ -50,7 +49,7 @@ export async function POST(request: Request) {
         // Check if the room allows overlap (e.g. sports field) — if so, skip room conflict
         let roomAllowsOverlap = false;
         if (room_id) {
-            const [roomRows] = await pool.query<RowDataPacket[]>('SELECT allow_overlap FROM Rooms WHERE id = ?', [room_id]);
+            const [roomRows] = await pool.query('SELECT allow_overlap FROM Rooms WHERE id = ?', [room_id]);
             roomAllowsOverlap = !!(roomRows[0]?.allow_overlap);
         }
 
@@ -86,10 +85,10 @@ export async function POST(request: Request) {
 
         query += ` )`;
 
-        const [conflicts] = await pool.query<RowDataPacket[]>(query, params);
+        const [conflicts] = await pool.query(query, params);
 
-        if (conflicts.length > 0) {
-            const conflictDetails = conflicts.map(c => {
+        if ((conflicts as any[]).length > 0) {
+            const conflictDetails = (conflicts as any[]).map((c: any) => {
                 if (teacher_id && c.teacher_id === teacher_id) return `ครู${c.teacher_name ?? ''}มีคาบสอนในช่วงเวลานี้แล้ว`;
                 if (room_id && c.room_id === room_id) return 'ห้องเรียนถูกใช้ในช่วงเวลานี้แล้ว';
                 if (c.class_id === class_id) return 'ชั้นเรียนมีคาบเรียนในช่วงเวลานี้แล้ว';
@@ -121,7 +120,7 @@ export async function PUT(request: Request) {
         }
 
         // Fetch existing schedule
-        const [existing] = await pool.query<RowDataPacket[]>('SELECT * FROM Schedules WHERE id = ?', [id]);
+        const [existing] = await pool.query('SELECT * FROM Schedules WHERE id = ?', [id]);
         if (existing.length === 0) {
             return NextResponse.json({ error: 'Schedule not found' }, { status: 404 });
         }
@@ -131,7 +130,7 @@ export async function PUT(request: Request) {
         // Check if the room allows overlap
         let roomAllowsOverlapPut = false;
         if (room_id) {
-            const [roomRows] = await pool.query<RowDataPacket[]>('SELECT allow_overlap FROM Rooms WHERE id = ?', [room_id]);
+            const [roomRows] = await pool.query('SELECT allow_overlap FROM Rooms WHERE id = ?', [room_id]);
             roomAllowsOverlapPut = !!(roomRows[0]?.allow_overlap);
         }
 
@@ -170,10 +169,10 @@ export async function PUT(request: Request) {
         
         // Only run conflict check if we are actually assigning a teacher or room that could conflict
         if (teacher_id || room_id) {
-            const [conflicts] = await pool.query<RowDataPacket[]>(conflictQuery, conflictParams);
+            const [conflicts] = await pool.query(conflictQuery, conflictParams);
     
-            if (conflicts.length > 0) {
-                const conflictDetails = conflicts.map(c => {
+            if ((conflicts as any[]).length > 0) {
+                const conflictDetails = (conflicts as any[]).map((c: any) => {
                     if (teacher_id && c.teacher_id === teacher_id) return `ครู${c.teacher_name ?? ''}มีคาบสอนในช่วงเวลานี้แล้ว`;
                     if (room_id && c.room_id === room_id) return 'ห้องเรียนถูกใช้ในช่วงเวลานี้แล้ว';
                     return 'พบคาบที่ชนกัน';

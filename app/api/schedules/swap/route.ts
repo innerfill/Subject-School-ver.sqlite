@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
 
 async function roomAllowsOverlap(room_id: number | null): Promise<boolean> {
     if (!room_id) return false;
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT allow_overlap FROM Rooms WHERE id = ?', [room_id]);
+    const [rows] = await pool.query('SELECT allow_overlap FROM Rooms WHERE id = ?', [room_id]);
     return !!(rows[0]?.allow_overlap);
 }
 
 async function checkConflict(
-    sched: RowDataPacket,
+    sched: any,
     targetDay: string,
     targetStart: string,
     targetEnd: string,
@@ -38,8 +37,8 @@ async function checkConflict(
     }
     query += ')';
 
-    const [conflicts] = await pool.query<RowDataPacket[]>(query, params);
-    return conflicts.map(c => {
+    const [conflicts] = await pool.query(query, params);
+    return (conflicts as any[]).map((c: any) => {
         if (sched.teacher_id && c.teacher_id === sched.teacher_id) return `ครู${c.teacher_name ?? ''}มีคาบสอนในช่วงเวลานี้แล้ว`;
         if (sched.room_id && c.room_id === sched.room_id) return 'ห้องเรียนถูกใช้ในช่วงเวลานี้แล้ว';
         return 'ชั้นเรียนมีคาบเรียนในช่วงเวลานี้แล้ว';
@@ -51,14 +50,14 @@ export async function POST(request: Request) {
         const { id_a, id_b } = await request.json();
         if (!id_a || !id_b) return NextResponse.json({ error: 'id_a and id_b required' }, { status: 400 });
 
-        const [rows] = await pool.query<RowDataPacket[]>(
+        const [rows] = await pool.query(
             'SELECT * FROM Schedules WHERE id IN (?, ?)',
             [id_a, id_b]
         );
         if (rows.length !== 2) return NextResponse.json({ error: 'Schedule not found' }, { status: 404 });
 
-        const schedA = rows.find(r => r.id === id_a)!;
-        const schedB = rows.find(r => r.id === id_b)!;
+        const schedA = (rows as any[]).find((r: any) => r.id === id_a)!;
+        const schedB = (rows as any[]).find((r: any) => r.id === id_b)!;
 
         if (schedA.is_locked || schedB.is_locked) {
             return NextResponse.json({ error: 'ไม่สามารถสลับคาบที่ล็อกได้' }, { status: 403 });

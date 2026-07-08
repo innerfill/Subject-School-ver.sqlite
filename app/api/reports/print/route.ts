@@ -18,7 +18,7 @@ export async function GET(request: Request) {
         let activeTermYear = '';
 
         if (!activeTermId) {
-            const [terms] = await pool.query('SELECT id, term, year FROM AcademicTerms WHERE status = "Active" LIMIT 1');
+            const [terms] = await pool.query(`SELECT id, term, year FROM AcademicTerms WHERE status = 'Active' LIMIT 1`);
             const termsArray = terms as any[];
             if (termsArray.length > 0) {
                 activeTermId = termsArray[0].id;

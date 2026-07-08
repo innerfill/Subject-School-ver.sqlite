@@ -4,9 +4,10 @@ import { pool } from '@/lib/db';
 export async function GET() {
     try {
         const [rows] = await pool.query(`
-      SELECT r.*, b.name as building_name 
-      FROM Rooms r 
+      SELECT r.*, b.name as building_name
+      FROM Rooms r
       LEFT JOIN Buildings b ON r.building_id = b.id
+      ORDER BY r.name ASC
     `);
         return NextResponse.json(rows);
     } catch (error) {

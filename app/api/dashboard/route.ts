@@ -6,7 +6,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         let termId = searchParams.get('term_id');
 
-        const [terms] = await pool.query('SELECT * FROM AcademicTerms WHERE status = "Active" LIMIT 1') as any;
+        const [terms] = await pool.query(`SELECT * FROM AcademicTerms WHERE status = 'Active' LIMIT 1`) as any;
         const activeTerm = terms[0] ?? null;
         if (!termId) termId = activeTerm?.id ?? null;
 

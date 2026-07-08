@@ -75,15 +75,14 @@ export async function POST(request: Request) {
             const gradeParams: any[] = gradeId === null ? [] : [gradeId];
 
             const [existingRows] = await pool.query(
-                `SELECT id, name, credits, hours_per_week, semester FROM Subjects WHERE code = ? AND type = ? AND is_active = TRUE AND ${gradeCheck}`,
-                [code, finalType, ...gradeParams]
+                `SELECT id, name, credits, hours_per_week, semester FROM Subjects WHERE code = ? AND name = ? AND type = ? AND is_active = TRUE AND ${gradeCheck}`,
+                [code, name, finalType, ...gradeParams]
             );
 
             if ((existingRows as any[]).length > 0) {
                 const ex = (existingRows as any[])[0];
                 const changes: string[] = [];
 
-                if (ex.name !== name) changes.push(`ชื่อ: "${ex.name}" → "${name}"`);
                 if (Number(ex.credits) !== base.credits) changes.push(`หน่วยกิต: ${ex.credits} → ${base.credits}`);
                 if (Number(ex.hours_per_week) !== base.hours_per_week) changes.push(`ชม.: ${ex.hours_per_week} → ${base.hours_per_week}`);
                 const exSem = ex.semester ?? null;
@@ -98,8 +97,8 @@ export async function POST(request: Request) {
             }
 
             const [inactiveRows] = await pool.query(
-                `SELECT id FROM Subjects WHERE code = ? AND type = ? AND is_active = FALSE AND ${gradeCheck}`,
-                [code, finalType, ...gradeParams]
+                `SELECT id FROM Subjects WHERE code = ? AND name = ? AND type = ? AND is_active = FALSE AND ${gradeCheck}`,
+                [code, name, finalType, ...gradeParams]
             );
             results.push({ ...base, status: (inactiveRows as any[]).length > 0 ? 'reactivate' : 'new' });
         }

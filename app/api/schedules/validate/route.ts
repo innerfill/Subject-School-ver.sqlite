@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
         let activeTermId = termId;
         if (!activeTermId) {
-            const [terms] = await pool.query('SELECT id FROM AcademicTerms WHERE status = "Active" LIMIT 1') as any;
+            const [terms] = await pool.query(`SELECT id FROM AcademicTerms WHERE status = 'Active' LIMIT 1`) as any;
             if (terms.length > 0) activeTermId = terms[0].id;
         }
 

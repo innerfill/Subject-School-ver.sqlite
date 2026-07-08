@@ -16,10 +16,17 @@ export async function POST(request: Request) {
 
         // If setting to Active, set others to Inactive
         if (status === 'Active') {
-            await pool.query('UPDATE AcademicTerms SET status = "Inactive"');
+            await pool.query(`UPDATE AcademicTerms SET status = 'Inactive'`);
         }
 
         // Handle empty dates by converting to NULL
+        const [existing] = await pool.query(
+            'SELECT id FROM AcademicTerms WHERE year = ? AND term = ?',
+            [year, term]
+        );
+        if ((existing as any[]).length > 0)
+            return NextResponse.json({ error: `ปีการศึกษา ${year} ภาคเรียน ${term} มีอยู่แล้ว` }, { status: 409 });
+
         const startDateVal = start_date === '' ? null : start_date;
         const endDateVal = end_date === '' ? null : end_date;
 
@@ -36,13 +43,20 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
     try {
-        const { id, status } = await request.json();
+        const { id, status, year, term, start_date, end_date } = await request.json();
 
         if (status === 'Active') {
-            await pool.query('UPDATE AcademicTerms SET status = "Inactive"');
+            await pool.query(`UPDATE AcademicTerms SET status = 'Inactive'`);
+            await pool.query('UPDATE AcademicTerms SET status = ? WHERE id = ?', [status, id]);
+        } else {
+            const startDateVal = start_date === '' ? null : start_date;
+            const endDateVal = end_date === '' ? null : end_date;
+            await pool.query(
+                'UPDATE AcademicTerms SET year = ?, term = ?, start_date = ?, end_date = ? WHERE id = ?',
+                [year, term, startDateVal, endDateVal, id]
+            );
         }
 
-        await pool.query('UPDATE AcademicTerms SET status = ? WHERE id = ?', [status, id]);
         return NextResponse.json({ success: true });
     } catch (error) {
         return NextResponse.json({ error: 'Failed to update academic term' }, { status: 500 });

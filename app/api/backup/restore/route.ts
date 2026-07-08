@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { spawn } from 'child_process';
+import { writeFile } from 'fs/promises';
+import path from 'path';
+import { resetDb } from '@/lib/db';
 
-const MYSQL = process.env.MYSQL_PATH || 'C:\\xampp\\mysql\\bin\\mysql.exe';
+const DB_PATH = path.join(process.cwd(), 'school_schedule.db');
 
-// POST /api/backup/restore  (multipart: file = .sql)
+// POST /api/backup/restore  (multipart: file = .db)
 export async function POST(request: Request) {
     let file: File;
     try {
@@ -12,38 +14,17 @@ export async function POST(request: Request) {
         if (!f || typeof f === 'string') throw new Error();
         file = f as File;
     } catch {
-        return NextResponse.json({ error: 'No .sql file provided' }, { status: 400 });
+        return NextResponse.json({ error: 'No .db file provided' }, { status: 400 });
     }
 
-    if (!file.name.endsWith('.sql'))
-        return NextResponse.json({ error: 'Only .sql files are accepted' }, { status: 400 });
+    if (!file.name.endsWith('.db'))
+        return NextResponse.json({ error: 'Only .db files are accepted' }, { status: 400 });
 
-    const sql = await file.text();
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    const host = process.env.DB_HOST || '127.0.0.1';
-    const user = process.env.DB_USER || 'root';
-    const pass = process.env.DB_PASSWORD || '';
-    const db   = process.env.DB_NAME  || 'school_schedule';
+    // Close current db connection, replace file, let it reopen on next request
+    resetDb();
+    await writeFile(DB_PATH, buffer);
 
-    const args = [
-        `-h${host}`, `-u${user}`,
-        ...(pass ? [`-p${pass}`] : []),
-        '--default-character-set=utf8mb4',
-        db,
-    ];
-
-    return new Promise<NextResponse>((resolve) => {
-        const proc = spawn(MYSQL, args);
-        let errOut = '';
-        proc.stderr.on('data', (d: Buffer) => { errOut += d.toString(); });
-        proc.on('close', (code) => {
-            if (code !== 0) {
-                resolve(NextResponse.json({ error: `Restore failed: ${errOut}` }, { status: 500 }));
-                return;
-            }
-            resolve(NextResponse.json({ success: true }));
-        });
-        proc.stdin.write(sql);
-        proc.stdin.end();
-    });
+    return NextResponse.json({ success: true });
 }

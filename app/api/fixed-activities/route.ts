@@ -3,6 +3,9 @@ import { pool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+// SQLite has no mysql2-style array expansion for IN (?) / VALUES ?
+const ph = (n: number) => Array(n).fill('?').join(',');
+
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
@@ -98,7 +101,7 @@ export async function POST(request: Request) {
         if (target_grade_level_ids.length > 0) {
             // 1. Find all classes in target grades for this term
             const [classes] = await pool.query(
-                `SELECT id, grade_level_id FROM Classes WHERE grade_level_id IN (?)`,
+                `SELECT id, grade_level_id FROM Classes WHERE grade_level_id IN (${ph(target_grade_level_ids.length)})`,
                 [target_grade_level_ids]
             );
 
@@ -109,7 +112,7 @@ export async function POST(request: Request) {
                 let subjectMap: any = {}; // grade_level_id -> subject_id
                 if (activity_group) {
                     const [subjects] = await pool.query(
-                        `SELECT id, grade_level_id FROM Subjects WHERE activity_group = ? AND grade_level_id IN (?)`,
+                        `SELECT id, grade_level_id FROM Subjects WHERE activity_group = ? AND grade_level_id IN (${ph(target_grade_level_ids.length)})`,
                         [activity_group, target_grade_level_ids]
                     );
                     (subjects as any[]).forEach(s => subjectMap[s.grade_level_id] = s.id);
@@ -132,7 +135,7 @@ export async function POST(request: Request) {
                         start_time,
                         end_time,
                         academic_term_id,
-                        true, // is_locked
+                        1, // is_locked (SQLite cannot bind boolean)
                         fixedActivityId
                     ]);
                 }
@@ -142,17 +145,17 @@ export async function POST(request: Request) {
                     // Clear existing schedules for these slots to avoid conflicts/duplicates
                     const classIds = (classes as any[]).map((c: any) => c.id);
                     await pool.query(
-                        `DELETE FROM Schedules 
-                         WHERE class_id IN (?) 
-                         AND day_of_week = ? 
-                         AND start_time = ? 
+                        `DELETE FROM Schedules
+                         WHERE class_id IN (${ph(classIds.length)})
+                         AND day_of_week = ?
+                         AND start_time = ?
                          AND academic_term_id = ?`,
                         [classIds, day_of_week, start_time, academic_term_id]
                     );
 
                     await pool.query(
-                        `INSERT INTO Schedules (teacher_id, subject_id, room_id, class_id, day_of_week, start_time, end_time, academic_term_id, is_locked, fixed_activity_id) 
-                         VALUES ?`,
+                        `INSERT INTO Schedules (teacher_id, subject_id, room_id, class_id, day_of_week, start_time, end_time, academic_term_id, is_locked, fixed_activity_id)
+                         VALUES ${scheduleValues.map(() => `(${ph(10)})`).join(',')}`,
                         [scheduleValues]
                     );
                 }
@@ -259,17 +262,17 @@ export async function PUT(request: Request) {
         // Regenerate Schedules for target classes
         if (target_grade_level_ids.length > 0) {
             const [classes] = await pool.query(
-                `SELECT id, grade_level_id FROM Classes WHERE grade_level_id IN (?)`,
+                `SELECT id, grade_level_id FROM Classes WHERE grade_level_id IN (${ph(target_grade_level_ids.length)})`,
                 [target_grade_level_ids]
             );
 
             if ((classes as any[]).length > 0) {
                 const scheduleValues = [];
                 let subjectMap: any = {};
-                
+
                 if (activity_group) {
                     const [subjects] = await pool.query(
-                        `SELECT id, grade_level_id FROM Subjects WHERE activity_group = ? AND grade_level_id IN (?)`,
+                        `SELECT id, grade_level_id FROM Subjects WHERE activity_group = ? AND grade_level_id IN (${ph(target_grade_level_ids.length)})`,
                         [activity_group, target_grade_level_ids]
                     );
                     (subjects as any[]).forEach(s => subjectMap[s.grade_level_id] = s.id);
@@ -282,21 +285,21 @@ export async function PUT(request: Request) {
                     }
 
                     scheduleValues.push([
-                        null, finalSubjectId, null, cls.id, day_of_week, start_time, end_time, academic_term_id, true, id
+                        null, finalSubjectId, null, cls.id, day_of_week, start_time, end_time, academic_term_id, 1, id
                     ]);
                 }
 
                 if (scheduleValues.length > 0) {
                     const classIds = (classes as any[]).map((c: any) => c.id);
                     await pool.query(
-                        `DELETE FROM Schedules 
-                         WHERE class_id IN (?) AND day_of_week = ? AND start_time = ? AND academic_term_id = ?`,
+                        `DELETE FROM Schedules
+                         WHERE class_id IN (${ph(classIds.length)}) AND day_of_week = ? AND start_time = ? AND academic_term_id = ?`,
                         [classIds, day_of_week, start_time, academic_term_id]
                     );
 
                     await pool.query(
-                        `INSERT INTO Schedules (teacher_id, subject_id, room_id, class_id, day_of_week, start_time, end_time, academic_term_id, is_locked, fixed_activity_id) 
-                         VALUES ?`,
+                        `INSERT INTO Schedules (teacher_id, subject_id, room_id, class_id, day_of_week, start_time, end_time, academic_term_id, is_locked, fixed_activity_id)
+                         VALUES ${scheduleValues.map(() => `(${ph(10)})`).join(',')}`,
                         [scheduleValues]
                     );
                 }

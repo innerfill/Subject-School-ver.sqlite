@@ -235,9 +235,12 @@ export default function SchedulePreview({ data, type }: SchedulePreviewProps) {
                         
                         return (
                             <div className={`flex-1 flex justify-between items-end pb-0 ${type === 'teacher' ? 'w-full' : ''}`}>
-                                {signatories.map((sig, index) => {
+                                {[...signatories].sort((a, b) => {
+                                        const order: Record<string, number> = { ISSUER: 0, ACADEMIC: 1, DIRECTOR: 2 };
+                                        return (order[a.role_key] ?? 9) - (order[b.role_key] ?? 9);
+                                    }).map((sig, index) => {
                                     // Custom Logic for Student Schedule: Replace first signature (usually Teacher) with Class Advisor
-                            if (type === 'student' && (sig.position_name.includes('ครูผู้สอน') || index === 0)) {
+                            if (type === 'student' && (sig.role_key === 'ISSUER' || sig.position_name.includes('ครูผู้สอน'))) {
                                 return (
                                     <React.Fragment key={sig.id}>
                                         <div className="flex-1 px-2 flex justify-center">
@@ -279,7 +282,7 @@ export default function SchedulePreview({ data, type }: SchedulePreviewProps) {
                             }
 
                             // Custom Logic for Teacher Schedule: Auto-fill Teacher Name
-                            if (type === 'teacher' && (sig.position_name.includes('ครูผู้สอน') || index === 0)) {
+                            if (type === 'teacher' && (sig.role_key === 'ISSUER' || sig.position_name.includes('ครูผู้สอน'))) {
                                 return (
                                     <div key={sig.id} className="flex-1 px-2 flex justify-center">
                                         <div className="grid grid-cols-[auto_auto] items-end justify-center">

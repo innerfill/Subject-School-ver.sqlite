@@ -42,9 +42,19 @@ next-env.d.ts
 
 # backup files
 backups/*.sql
+backups/*.db
+
+# SQLite database (runtime data)
+school_schedule.db
+school_schedule.db-shm
+school_schedule.db-wal
 
 # local files
 .claude/
 delete_success.log
 *.rar
 *.zip
+*.7z
+*.db.bak*
+subjects_all.csv
+SALES_PLAN.md

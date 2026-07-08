@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const activeOnly = searchParams.get('active_only') === '1';
         const [rows] = await pool.query(`
       SELECT c.*,
              g.name as grade_level_name,
@@ -16,7 +18,8 @@ export async function GET() {
       LEFT JOIN Teachers t2 ON c.advisor2_id = t2.id
       LEFT JOIN Rooms r ON c.home_room_id = r.id
       LEFT JOIN AcademicTerms at ON c.academic_term_id = at.id
-      ORDER BY g.id ASC, CAST(SUBSTRING_INDEX(c.name, '/', -1) AS UNSIGNED) ASC, c.name ASC
+      ${activeOnly ? "WHERE at.status = 'Active'" : ''}
+      ORDER BY g.id ASC, c.name ASC
     `);
         return NextResponse.json(rows);
     } catch (error) {

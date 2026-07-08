@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, Edit, Layers, Search, X, Filter } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Trash2, Plus, Edit, Layers, Search, X, Filter, Copy } from 'lucide-react';
 import { useToast } from '@/components/ToastProvider';
 import { useConfirm } from '@/components/ConfirmProvider';
 
@@ -38,7 +38,25 @@ export default function ClassesPage() {
     const { showToast } = useToast();
     const confirm = useConfirm();
 
+    const [allTerms, setAllTerms] = useState<{ id: number; year: number; term: number }[]>([]);
+    const [copyModal, setCopyModal] = useState(false);
+    const [sourceTermId, setSourceTermId] = useState('');
+
     const [addForm, setAddForm] = useState(emptyForm);
+
+    const nextRoomFor = useCallback((gradeId: string) => {
+        if (!gradeId) return '';
+        const used = classes
+            .filter(c => c.grade_level_id?.toString() === gradeId)
+            .map(c => parseInt(c.name.split('/').pop() || '0'))
+            .filter(n => n > 0);
+        return used.length === 0 ? '1' : String(Math.max(...used) + 1);
+    }, [classes]);
+
+    useEffect(() => {
+        setAddForm(prev => ({ ...prev, roomNum: nextRoomFor(prev.grade_level_id) }));
+    }, [addForm.grade_level_id, classes, nextRoomFor]);
+
     const [editModal, setEditModal] = useState<{ open: boolean; cls: Class | null }>({ open: false, cls: null });
     const [editForm, setEditForm] = useState(emptyForm);
 
@@ -47,9 +65,9 @@ export default function ClassesPage() {
     const fetchData = async () => {
         try {
             const [classesRes, gradesRes, teachersRes, roomsRes, termsRes] = await Promise.all([
-                fetch('/api/classes'),
+                fetch('/api/classes?active_only=1'),
                 fetch('/api/master-data?type=grades'),
-                fetch('/api/teachers'),
+                fetch('/api/teachers?active_only=1'),
                 fetch('/api/rooms'),
                 fetch('/api/academic-terms'),
             ]);
@@ -59,6 +77,7 @@ export default function ClassesPage() {
             setRooms(await roomsRes.json());
 
             const termsData = await termsRes.json();
+            setAllTerms(termsData);
             const active = termsData.find((t: any) => t.status === 'Active');
             if (active) {
                 setActiveTermId(active.id.toString());
@@ -87,6 +106,7 @@ export default function ClassesPage() {
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!addForm.roomNum) { showToast('เลือกระดับชั้นก่อน', 'error'); return; }
         const gradeName = grades.find(g => g.id.toString() === addForm.grade_level_id)?.name || '';
         const className = gradeName && addForm.roomNum ? `${gradeName}/${addForm.roomNum}` : addForm.roomNum;
         const res = await fetch('/api/classes', {
@@ -137,6 +157,24 @@ export default function ClassesPage() {
         }
     };
 
+    const handleCopy = async () => {
+        if (!sourceTermId) { showToast('เลือกภาคเรียนต้นทางก่อน', 'error'); return; }
+        const res = await fetch('/api/classes/copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_term_id: parseInt(sourceTermId), target_term_id: parseInt(activeTermId) }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            setCopyModal(false);
+            setSourceTermId('');
+            fetchData();
+            showToast(`คัดลอกสำเร็จ ${data.copied} ห้อง${data.skipped ? ` (ข้าม ${data.skipped} ซ้ำ)` : ''}`, 'success');
+        } else {
+            showToast(data.error || 'คัดลอกไม่สำเร็จ', 'error');
+        }
+    };
+
     const handleDelete = async (id: number) => {
         const isConfirmed = await confirm('คุณต้องการลบชั้นเรียนนี้ใช่หรือไม่?');
         if (!isConfirmed) return;
@@ -149,11 +187,19 @@ export default function ClassesPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <h1 className="page-title">ชั้นเรียน</h1>
-                {activeTermLabel && (
-                    <span className="text-sm px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
-                        ปีการศึกษา {activeTermLabel}
-                    </span>
-                )}
+                <div className="flex items-center gap-3 flex-wrap">
+                    {activeTermLabel && (
+                        <span className="text-sm px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
+                            ปีการศึกษา {activeTermLabel}
+                        </span>
+                    )}
+                    {activeTermId && (
+                        <button onClick={() => { setSourceTermId(''); setCopyModal(true); }}
+                            className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            <Copy className="w-3.5 h-3.5" /> คัดลอกชั้นเรียนจากภาคก่อน
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Add Form */}
@@ -172,11 +218,12 @@ export default function ClassesPage() {
                         </div>
                         <div>
                             <label className="form-label">ห้องที่ <span className="text-red-500">*</span></label>
-                            <input
-                                type="number" required min={1} max={20} className="form-input" placeholder="1"
-                                value={addForm.roomNum}
-                                onChange={e => setAddForm({ ...addForm, roomNum: e.target.value })}
-                            />
+                            <div className={`form-input flex items-center justify-between ${!addForm.grade_level_id ? 'bg-gray-50 dark:bg-gray-700/50 text-gray-400' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold'}`}>
+                                <span>{addForm.roomNum || '—'}</span>
+                                {addForm.grade_level_id && (
+                                    <span className="text-xs font-normal text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">อัตโนมัติ</span>
+                                )}
+                            </div>
                         </div>
                         <div>
                             <label className="form-label">ห้องโฮมรูม</label>
@@ -342,6 +389,46 @@ export default function ClassesPage() {
             </div>
 
             {/* Edit Modal */}
+            {copyModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">คัดลอกชั้นเรียนจากภาคก่อน</h2>
+                            <button onClick={() => setCopyModal(false)}
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                คัดลอกรายชื่อห้องเรียนมาใช้ในภาคเรียนปัจจุบัน <span className="font-medium text-blue-600 dark:text-blue-400">{activeTermLabel}</span>
+                            </p>
+                            <div>
+                                <label className="form-label">เลือกภาคเรียนต้นทาง</label>
+                                <select className="form-select" value={sourceTermId} onChange={e => setSourceTermId(e.target.value)}>
+                                    <option value="">-- เลือกภาคเรียน --</option>
+                                    {allTerms
+                                        .filter(t => t.id.toString() !== activeTermId)
+                                        .map(t => <option key={t.id} value={t.id}>ปีการศึกษา {t.year} ภาคเรียน {t.term}</option>)
+                                    }
+                                </select>
+                            </div>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">ห้องที่มีชื่อซ้ำกับภาคปัจจุบันจะถูกข้าม</p>
+                            <div className="flex gap-3 justify-end pt-1">
+                                <button onClick={() => setCopyModal(false)}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    ยกเลิก
+                                </button>
+                                <button onClick={handleCopy}
+                                    className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-2">
+                                    <Copy className="w-4 h-4" /> คัดลอก
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {editModal.open && editModal.cls && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md">

@@ -6,25 +6,21 @@ import { useState, useRef, useEffect } from 'react';
 import {
     Calendar, Users, BookOpen, MapPin, Layers, Database,
     Clock, Lock, ClipboardList, Printer, ChevronDown, Menu,
-    Sun, Moon, BarChart2, FileText, ClipboardCheck, UserX, Settings, Shield, ShieldAlert
+    Sun, Moon, BarChart2, ClipboardCheck, Settings, ShieldAlert
 } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
-import { useSession, signOut } from 'next-auth/react';
-import { LogOut, KeyRound } from 'lucide-react';
 
 export default function Navbar() {
     const pathname = usePathname();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { theme, toggleTheme } = useTheme();
-    const { data: session } = useSession();
-    const isAdmin = (session?.user as any)?.role === 'admin';
 
     // Close mobile menu when route changes
     useEffect(() => {
         setIsMobileMenuOpen(false);
     }, [pathname]);
 
-    if (pathname.includes('/print') || pathname === '/login') {
+    if (pathname.includes('/print')) {
         return null;
     }
 
@@ -87,12 +83,6 @@ export default function Navbar() {
                             ตั้งค่า
                         </NavItem>
 
-                        {isAdmin && (
-                            <NavItem href="/admin" icon={<Shield className="w-4 h-4" />} active={pathname.startsWith('/admin')}>
-                                Admin
-                            </NavItem>
-                        )}
-
                         {/* Theme Toggle */}
                         <button
                             onClick={toggleTheme}
@@ -101,8 +91,6 @@ export default function Navbar() {
                         >
                             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                         </button>
-
-                        <UserMenu session={session} isAdmin={isAdmin} />
                     </div>
 
                     {/* Mobile Menu Button */}
@@ -150,17 +138,6 @@ export default function Navbar() {
                         <MobileNavItem href="/schedule" icon={<Calendar className="w-4 h-4" />}>จัดตาราง</MobileNavItem>
                         <MobileNavItem href="/reports" icon={<Printer className="w-4 h-4" />}>ออกรายงาน</MobileNavItem>
                         <MobileNavItem href="/settings" icon={<Settings className="w-4 h-4" />}>ตั้งค่า</MobileNavItem>
-                        {isAdmin && <MobileNavItem href="/admin" icon={<Shield className="w-4 h-4" />}>Admin Console</MobileNavItem>}
-
-                        <div className="border-t border-gray-200 my-2 dark:border-gray-700"></div>
-                        <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 truncate">{session?.user?.name || session?.user?.email}</div>
-                        <button
-                            onClick={() => signOut({ callbackUrl: '/login' })}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                        >
-                            <LogOut className="w-4 h-4" />
-                            ออกจากระบบ
-                        </button>
                     </div>
                 </div>
             )}
@@ -172,14 +149,15 @@ function NavItem({ href, icon, children, active }: { href: string, icon: React.R
     return (
         <Link
             href={href}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+            className={`relative flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                 ${active
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
                     : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-blue-400'
                 }`}
         >
             {icon}
             {children}
+            {active && <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
         </Link>
     );
 }
@@ -202,15 +180,16 @@ function Dropdown({ title, icon, children, active }: { title: string, icon: Reac
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none
+                className={`relative flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none
                     ${active || isOpen
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
                         : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-blue-400'
                     }`}
             >
                 {icon}
                 {title}
                 <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                {active && !isOpen && <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
             </button>
 
             {isOpen && (
@@ -223,94 +202,38 @@ function Dropdown({ title, icon, children, active }: { title: string, icon: Reac
 }
 
 function DropdownItem({ href, icon, children }: { href: string, icon: React.ReactNode, children: React.ReactNode }) {
+    const pathname = usePathname();
+    const active = pathname === href;
     return (
         <Link
             href={href}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-blue-400"
+            className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors border-l-2 ${
+                active
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-400'
+                    : 'border-transparent text-gray-700 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-blue-400'
+            }`}
         >
-            <span className="text-gray-400 group-hover:text-blue-500 dark:text-gray-500 dark:group-hover:text-blue-400">{icon}</span>
+            <span className={active ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}>{icon}</span>
             {children}
         </Link>
     );
 }
 
 function MobileNavItem({ href, icon, children }: { href: string, icon?: React.ReactNode, children: React.ReactNode }) {
+    const pathname = usePathname();
+    const active = pathname === href;
     return (
         <Link
             href={href}
-            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700 flex items-center gap-2"
+            className={`flex items-center gap-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                active
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700'
+            }`}
         >
             {icon}
             {children}
+            {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />}
         </Link>
-    );
-}
-
-function UserMenu({ session, isAdmin }: { session: any; isAdmin: boolean }) {
-    const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-    const user = session?.user;
-
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
-    if (!user) return null;
-
-    const initials = (user.name || user.email || '?')[0].toUpperCase();
-
-    return (
-        <div className="relative ml-1" ref={ref}>
-            <button
-                onClick={() => setOpen(!open)}
-                className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-                {user.image ? (
-                    <img src={user.image} alt="" className="w-7 h-7 rounded-full object-cover" />
-                ) : (
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                        {initials}
-                    </div>
-                )}
-                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </button>
-
-            {open && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 z-50 overflow-hidden">
-                    {/* User info */}
-                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name || '—'}</p>
-                        <p className="text-xs text-gray-400 truncate mt-0.5">{user.email}</p>
-                        <span className={`inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            isAdmin
-                                ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                        }`}>
-                            {isAdmin && <Shield className="w-3 h-3" />}
-                            {isAdmin ? 'admin' : 'user'}
-                        </span>
-                    </div>
-                    {/* Account link */}
-                    <Link href="/account"
-                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                        onClick={() => setOpen(false)}>
-                        <KeyRound className="w-4 h-4 text-gray-400" />
-                        เปลี่ยนรหัสผ่าน
-                    </Link>
-                    {/* Logout */}
-                    <button
-                        onClick={() => signOut({ callbackUrl: '/login' })}
-                        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-t border-gray-100 dark:border-gray-700"
-                    >
-                        <LogOut className="w-4 h-4" />
-                        ออกจากระบบ
-                    </button>
-                </div>
-            )}
-        </div>
     );
 }

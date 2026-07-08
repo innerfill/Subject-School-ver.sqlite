@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trash2, Plus, Edit, Users, Search, X } from 'lucide-react';
+import { Trash2, Plus, Edit, Users, Search, X, UserCheck, UserX } from 'lucide-react';
 import { useToast } from '@/components/ToastProvider';
 import { useConfirm } from '@/components/ConfirmProvider';
 
@@ -15,10 +15,11 @@ interface Teacher {
     department_id?: number;
     advisor_class?: string;
     advisor_class_id?: number;
+    is_active: number;
 }
 
 interface Department { id: number; name: string; }
-interface Class { id: number; name: string; }
+interface Class { id: number; name: string; grade_level_name?: string; grade_level_id?: number; }
 
 const PRESET_COLORS = [
     '#ef4444', '#f97316', '#eab308', '#22c55e',
@@ -54,12 +55,30 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
     );
 }
 
+function ClassOptions({ classes }: { classes: Class[] }) {
+    const groups = classes.reduce<Record<string, Class[]>>((acc, c) => {
+        const g = c.grade_level_name || 'ไม่ระบุระดับชั้น';
+        (acc[g] = acc[g] || []).push(c);
+        return acc;
+    }, {});
+    return (
+        <>
+            {Object.entries(groups).map(([grade, items]) => (
+                <optgroup key={grade} label={grade}>
+                    {items.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </optgroup>
+            ))}
+        </>
+    );
+}
+
 export default function TeachersPage() {
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
     const [classes, setClasses] = useState<Class[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [showInactive, setShowInactive] = useState(false);
     const { showToast } = useToast();
     const confirm = useConfirm();
 
@@ -74,7 +93,7 @@ export default function TeachersPage() {
             const [teachersRes, deptsRes, classesRes] = await Promise.all([
                 fetch('/api/teachers'),
                 fetch('/api/master-data?type=departments'),
-                fetch('/api/classes')
+                fetch('/api/classes?active_only=1')
             ]);
             setTeachers(await teachersRes.json());
             setDepartments(await deptsRes.json());
@@ -141,10 +160,29 @@ export default function TeachersPage() {
         showToast('ลบข้อมูลครูสำเร็จ', 'success');
     };
 
-    const filtered = teachers.filter(t =>
-        !search || formatTeacherName(t).toLowerCase().includes(search.toLowerCase()) ||
-        (t.department_name || '').toLowerCase().includes(search.toLowerCase())
-    );
+    const handleToggleActive = async (t: Teacher) => {
+        const next = t.is_active ? 0 : 1;
+        const msg = next ? `เปิดการใช้งาน "${t.name}" อีกครั้ง?` : `ปิดการใช้งาน "${t.name}"?\nครูจะไม่ปรากฏในเมนูสำหรับจัดตาราง`;
+        if (!await confirm(msg)) return;
+        const res = await fetch('/api/teachers', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: t.id, is_active: next }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.error || 'ดำเนินการไม่สำเร็จ', 'error');
+            return;
+        }
+        fetchData();
+        showToast(next ? `เปิดการใช้งาน ${t.name} แล้ว` : `ปิดการใช้งาน ${t.name} แล้ว`, 'success');
+    };
+
+    const filtered = teachers.filter(t => {
+        if (!showInactive && !t.is_active) return false;
+        return !search || formatTeacherName(t).toLowerCase().includes(search.toLowerCase()) ||
+            (t.department_name || '').toLowerCase().includes(search.toLowerCase());
+    });
 
     return (
         <div className="space-y-6">
@@ -173,7 +211,7 @@ export default function TeachersPage() {
                         </div>
                         <div>
                             <label className="form-label">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
-                            <input type="text" required className="form-input" placeholder="เช่น จันทร์ทิรา วันชูเสริฐ"
+                            <input type="text" required className="form-input" placeholder="เช่น สมศรี ใจดี"
                                 value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} />
                         </div>
                         <div>
@@ -209,9 +247,20 @@ export default function TeachersPage() {
             <div className="data-table-container">
                 {/* search + count header */}
                 <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {loading ? '...' : `${filtered.length} / ${teachers.length} คน`}
-                    </span>
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {loading ? '...' : `${filtered.length} / ${teachers.length} คน`}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setShowInactive(v => !v)}
+                            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${showInactive
+                                ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700'
+                                : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600'}`}
+                        >
+                            {showInactive ? 'แสดงทั้งหมด' : 'ซ่อนที่ปิดการใช้งาน'}
+                        </button>
+                    </div>
                     <div className="relative w-56">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
@@ -260,20 +309,31 @@ export default function TeachersPage() {
                             </tr>
                         ) : (
                             filtered.map(t => (
-                                <tr key={t.id} className="table-row">
+                                <tr key={t.id} className={`table-row ${!t.is_active ? 'opacity-50' : ''}`}>
                                     <td className="table-td-primary">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                                            <div className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: t.is_active ? t.color : '#9ca3af' }} />
                                             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                                                style={{ backgroundColor: t.color }}>
+                                                style={{ backgroundColor: t.is_active ? t.color : '#9ca3af' }}>
                                                 {t.name.charAt(0)}
                                             </div>
-                                            <span>{formatTeacherName(t)}</span>
+                                            <div>
+                                                <span>{formatTeacherName(t)}</span>
+                                                {!t.is_active && (
+                                                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">ปิดการใช้งาน</span>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="table-td">{t.department_name || <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
                                     <td className="table-td">{t.advisor_class || <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
                                     <td className="table-td-right flex justify-end gap-3 items-center">
+                                        <button onClick={() => handleToggleActive(t)} title={t.is_active ? 'ปิดการใช้งาน' : 'เปิดใช้งาน'}
+                                            className={t.is_active
+                                                ? 'text-green-500 hover:text-amber-500 dark:hover:text-amber-400 transition-colors'
+                                                : 'text-gray-400 hover:text-green-500 dark:hover:text-green-400 transition-colors'}>
+                                            {t.is_active ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                                        </button>
                                         <button onClick={() => handleEdit(t)}
                                             className="text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 transition-colors" title="แก้ไข">
                                             <Edit className="w-4 h-4" />
@@ -347,7 +407,7 @@ export default function TeachersPage() {
                                 <select className="form-select" value={editForm.class_id}
                                     onChange={e => setEditForm({ ...editForm, class_id: e.target.value })}>
                                     <option value="">ไม่ระบุ</option>
-                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    <ClassOptions classes={classes} />
                                 </select>
                             </div>
                             <div>

@@ -111,8 +111,8 @@ export default function ReportsPage() {
     const fetchMasterData = async () => {
         try {
             const [classesRes, teachersRes, deptsRes, gradesRes] = await Promise.all([
-                fetch('/api/classes'),
-                fetch('/api/teachers'),
+                fetch('/api/classes?active_only=1'),
+                fetch('/api/teachers?active_only=1'),
                 fetch('/api/master-data?type=departments'),
                 fetch('/api/master-data?type=grades')
             ]);

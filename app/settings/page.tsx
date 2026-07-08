@@ -1,17 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import BackupPanel from '@/components/BackupPanel';
 
 export default function SettingsPage() {
-    const { data: session, status } = useSession();
-    const router = useRouter();
-
-    useEffect(() => {}, [status, session]);
-
     return (
         <div className="max-w-2xl mx-auto space-y-10 font-sarabun">
             <div className="flex items-center gap-3">

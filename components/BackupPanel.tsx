@@ -67,7 +67,7 @@ export default function BackupPanel() {
                     </div>
                     <div>
                         <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">สำรองข้อมูล</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">ส่งออก SQL dump ของฐานข้อมูลทั้งหมด</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">ส่งออกไฟล์ฐานข้อมูล SQLite ทั้งหมด</p>
                     </div>
                 </div>
                 {/* body */}
@@ -78,7 +78,7 @@ export default function BackupPanel() {
                             disabled:opacity-50 disabled:cursor-not-allowed
                             transition-all shadow-sm shadow-blue-200 dark:shadow-none">
                         {downloading ? <Spinner /> : <Download className="w-4 h-4" />}
-                        {downloading ? 'กำลังสร้าง...' : 'ดาวน์โหลด .sql'}
+                        {downloading ? 'กำลังสร้าง...' : 'ดาวน์โหลด .db'}
                     </button>
                 </div>
             </div>
@@ -92,7 +92,7 @@ export default function BackupPanel() {
                     </div>
                     <div>
                         <p className="text-sm font-semibold text-red-700 dark:text-red-300">กู้คืนข้อมูล</p>
-                        <p className="text-xs text-red-400 dark:text-red-500">Restore จากไฟล์ .sql</p>
+                        <p className="text-xs text-red-400 dark:text-red-500">Restore จากไฟล์ .db</p>
                     </div>
                 </div>
 
@@ -112,7 +112,7 @@ export default function BackupPanel() {
                             <FileCheck className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">เลือกไฟล์ .sql</p>
+                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">เลือกไฟล์ .db</p>
                             <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-colors
                                 ${restoreFile
                                     ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20'
@@ -122,7 +122,7 @@ export default function BackupPanel() {
                                 <span className={`text-sm truncate ${restoreFile ? 'text-emerald-700 dark:text-emerald-300 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
                                     {restoreFile ? restoreFile.name : 'คลิกเพื่อเลือกไฟล์'}
                                 </span>
-                                <input ref={fileInputRef} type="file" accept=".sql" className="hidden"
+                                <input ref={fileInputRef} type="file" accept=".db" className="hidden"
                                     onChange={e => { setRestoreFile(e.target.files?.[0] || null); setRestoreConfirm(''); }} />
                             </label>
                         </div>

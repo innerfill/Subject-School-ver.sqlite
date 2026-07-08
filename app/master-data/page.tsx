@@ -37,8 +37,8 @@ export default function MasterDataPage() {
     const [schoolSettings, setSchoolSettings] = useState({ id: 0, school_name: '', affiliation: '', logo_url: '', table_theme: 'blue' });
     const [savingSchool, setSavingSchool] = useState(false);
 
-    const [buildingForm, setBuildingForm] = useState({ name: '', zone: '' });
-    const [editingBuilding, setEditingBuilding] = useState<{ id: number; name: string; zone: string } | null>(null);
+    const [buildingForm, setBuildingForm] = useState({ name: '' });
+    const [editingBuilding, setEditingBuilding] = useState<{ id: number; name: string } | null>(null);
 
     const buildingInputRef = useRef<HTMLInputElement>(null);
     const logoInputRef = useRef<HTMLInputElement>(null);
@@ -335,7 +335,7 @@ export default function MasterDataPage() {
                 <form
                     onSubmit={e => {
                         e.preventDefault();
-                        handleAdd('buildings', buildingForm, () => setBuildingForm({ name: '', zone: '' }), buildingInputRef);
+                        handleAdd('buildings', buildingForm, () => setBuildingForm({ name: '' }), buildingInputRef);
                     }}
                     className="flex gap-3 mb-5 items-end flex-wrap"
                 >
@@ -347,15 +347,6 @@ export default function MasterDataPage() {
                             className="form-input"
                             value={buildingForm.name}
                             onChange={e => setBuildingForm({ ...buildingForm, name: e.target.value })}
-                        />
-                    </div>
-                    <div className="w-28">
-                        <label className="form-label">โซน (ถ้ามี)</label>
-                        <input
-                            placeholder="เช่น A, B"
-                            className="form-input"
-                            value={buildingForm.zone}
-                            onChange={e => setBuildingForm({ ...buildingForm, zone: e.target.value })}
                         />
                     </div>
                     <button type="submit" className="bg-emerald-600 text-white px-5 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2 font-medium transition-colors">
@@ -383,13 +374,6 @@ export default function MasterDataPage() {
                                             onKeyDown={e => { if (e.key === 'Enter') handleEditBuildingSave(); if (e.key === 'Escape') setEditingBuilding(null); }}
                                             placeholder="ชื่ออาคาร"
                                         />
-                                        <input
-                                            className="form-input text-sm"
-                                            value={editingBuilding.zone}
-                                            onChange={e => setEditingBuilding({ ...editingBuilding, zone: e.target.value })}
-                                            onKeyDown={e => { if (e.key === 'Enter') handleEditBuildingSave(); if (e.key === 'Escape') setEditingBuilding(null); }}
-                                            placeholder="โซน (ถ้ามี)"
-                                        />
                                         <div className="flex gap-2 justify-end">
                                             <button type="button" onClick={() => setEditingBuilding(null)}
                                                 className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -409,14 +393,10 @@ export default function MasterDataPage() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">{b.name}</div>
-                                            {b.zone
-                                                ? <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">โซน {b.zone}</div>
-                                                : <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">ไม่มีโซน</div>
-                                            }
                                         </div>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button type="button"
-                                                onClick={() => setEditingBuilding({ id: b.id, name: b.name, zone: b.zone || '' })}
+                                                onClick={() => setEditingBuilding({ id: b.id, name: b.name })}
                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors">
                                                 <Edit className="w-3.5 h-3.5" />
                                             </button>

@@ -1,13 +1,25 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const activeOnly = searchParams.get('active_only') === '1';
+        const classJoin = activeOnly
+            ? `LEFT JOIN Classes c ON (c.advisor_id = t.id OR c.advisor2_id = t.id)
+                   AND c.academic_term_id = (SELECT id FROM AcademicTerms WHERE status = 'Active' LIMIT 1)`
+            : `LEFT JOIN Classes c ON c.advisor_id = t.id OR c.advisor2_id = t.id`;
         const [rows] = await pool.query(`
-            SELECT t.*, d.name as department_name, c.name as advisor_class, c.id as advisor_class_id
-            FROM Teachers t 
+            SELECT t.*, d.name as department_name, c.name as advisor_class, c.id as advisor_class_id,
+                   g.order_index as grade_order
+            FROM Teachers t
             LEFT JOIN Departments d ON t.department_id = d.id
-            LEFT JOIN Classes c ON c.advisor_id = t.id OR c.advisor2_id = t.id
+            ${classJoin}
+            LEFT JOIN GradeLevels g ON c.grade_level_id = g.id
+            ${activeOnly ? 'WHERE t.is_active = 1' : ''}
+            GROUP BY t.id
+            ORDER BY CASE WHEN g.order_index IS NULL THEN 1 ELSE 0 END,
+                     g.order_index ASC, c.name ASC, t.name ASC
         `);
         return NextResponse.json(rows);
     } catch (error) {
@@ -84,6 +96,32 @@ export async function PUT(request: Request) {
     } catch (error) {
         console.error('Update teacher error:', error);
         return NextResponse.json({ error: 'Failed to update teacher' }, { status: 500 });
+    }
+}
+
+export async function PATCH(request: Request) {
+    try {
+        const { id, is_active } = await request.json();
+        if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+
+        if (!is_active) {
+            const [rows] = await pool.query(
+                'SELECT COUNT(*) as cnt FROM CourseAssignments WHERE teacher_id = ?',
+                [id]
+            );
+            const cnt = (rows as any[])[0].cnt;
+            if (cnt > 0) {
+                return NextResponse.json(
+                    { error: `ยังมีการมอบหมายงานสอน ${cnt} รายการ กรุณาล้างข้อมูลในหน้า "มอบหมายงานสอน" ก่อน` },
+                    { status: 409 }
+                );
+            }
+        }
+
+        await pool.query('UPDATE Teachers SET is_active = ? WHERE id = ?', [is_active ? 1 : 0, id]);
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        return NextResponse.json({ error: 'Failed to update teacher status' }, { status: 500 });
     }
 }
 

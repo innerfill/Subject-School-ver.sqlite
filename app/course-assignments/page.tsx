@@ -43,8 +43,8 @@ export default function CourseAssignmentsPage() {
     useEffect(() => {
         Promise.all([
             fetch('/api/academic-terms').then(r => r.json()),
-            fetch('/api/classes').then(r => r.json()),
-            fetch('/api/teachers').then(r => r.json()),
+            fetch('/api/classes?active_only=1').then(r => r.json()),
+            fetch('/api/teachers?active_only=1').then(r => r.json()),
             fetch('/api/rooms').then(r => r.json()),
         ]).then(([termsData, classesData, teachersData, roomsData]) => {
             const active = termsData.find((t: Term) => t.status === 'Active') ?? null;

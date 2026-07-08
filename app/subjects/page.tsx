@@ -513,7 +513,9 @@ export default function SubjectsPage() {
                 if (data.inserted > 0) parts.push(`เพิ่ม ${data.inserted} วิชา`);
                 if (data.updated > 0) parts.push(`แก้ไข ${data.updated} วิชา`);
                 if (data.reactivated > 0) parts.push(`กู้คืน ${data.reactivated} วิชา`);
-                showToast(`Import สำเร็จ — ${parts.join(', ')}`, 'success');
+                if (data.skipped > 0) parts.push(`ข้าม ${data.skipped} ซ้ำ`);
+                if (data.invalid > 0) parts.push(`ผิดพลาด ${data.invalid}`);
+                showToast(`Import สำเร็จ — ${parts.join(', ') || 'ไม่มีการเปลี่ยนแปลง'}`, 'success');
                 setImportPreview({ open: false, rows: [], summary: null, loading: false, confirming: false });
                 fetchData();
             } else {

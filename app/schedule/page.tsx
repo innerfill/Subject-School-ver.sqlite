@@ -405,8 +405,8 @@ export default function SchedulePage() {
     useEffect(() => {
         Promise.all([
             fetch('/api/time-slots').then(res => res.json()),
-            fetch('/api/classes').then(res => res.json()),
-            fetch('/api/teachers').then(res => res.json()),
+            fetch('/api/classes?active_only=1').then(res => res.json()),
+            fetch('/api/teachers?active_only=1').then(res => res.json()),
             fetch('/api/subjects').then(res => res.json()),
             fetch('/api/rooms').then(res => res.json()),
             fetch('/api/academic-terms').then(res => res.json())

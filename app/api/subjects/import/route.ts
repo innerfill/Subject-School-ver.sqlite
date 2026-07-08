@@ -37,8 +37,11 @@ export async function POST(request: Request) {
             if (!code || !name) { invalidCount++; continue; }
 
             const mappedType = typeMap[type?.trim()?.toLowerCase()] || typeMap[type?.trim()] || 'Fundamental';
-            const mappedCredits = parseFloat(credits) || 1.0;
-            const mappedHours = parseInt(hours_per_week) || 2;
+            // Match preview logic exactly — credits=0 is valid (activities), not a fallback trigger
+            const creditsNum = parseFloat(credits);
+            const mappedCredits = isNaN(creditsNum) ? 1.0 : creditsNum;
+            const hoursNum = parseInt(hours_per_week);
+            const mappedHours = isNaN(hoursNum) || hoursNum < 1 ? 2 : hoursNum;
             const semesterValue = semester === 1 || semester === '1' ? 1
                 : semester === 2 || semester === '2' ? 2 : null;
             const mappedGradeId: number | null =
@@ -46,16 +49,6 @@ export async function POST(request: Request) {
                     ? (row.grade_level_id || null)
                     : (gradeMap.get(grade_level_name?.trim()?.toLowerCase()) ?? null);
             const agGroup = mappedType === 'Activity' ? activityGroup(name) : null;
-
-            // Update existing active record
-            if (status === 'update' && existingId) {
-                await pool.query(
-                    'UPDATE Subjects SET name=?, credits=?, hours_per_week=?, grade_level_id=?, semester=?, activity_group=? WHERE id=?',
-                    [name.trim(), mappedCredits, mappedHours, mappedGradeId, semesterValue, agGroup, existingId]
-                );
-                updatedCount++;
-                continue;
-            }
 
             const isActivityNoGrade = mappedType === 'Activity' && mappedGradeId === null;
             const gradeCheck = isActivityNoGrade
@@ -65,15 +58,36 @@ export async function POST(request: Request) {
                     : 'grade_level_id = ?';
             const gradeParams: any[] = mappedGradeId === null ? [] : [mappedGradeId];
 
+            // Update existing active record — re-lookup by code+name+type+grade to avoid stale existingId
+            if (status === 'update') {
+                const [lookupRows] = await pool.query(
+                    `SELECT id FROM Subjects WHERE code = ? AND name = ? AND type = ? AND is_active = TRUE AND ${gradeCheck}`,
+                    [code, name.trim(), mappedType, ...gradeParams]
+                );
+                const updateId = (lookupRows as any[]).length > 0
+                    ? (lookupRows as any[])[0].id
+                    : existingId;
+                if (updateId) {
+                    await pool.query(
+                        'UPDATE Subjects SET name=?, credits=?, hours_per_week=?, type=?, grade_level_id=?, semester=?, activity_group=? WHERE id=?',
+                        [name.trim(), mappedCredits, mappedHours, mappedType, mappedGradeId, semesterValue, agGroup, updateId]
+                    );
+                    updatedCount++;
+                } else {
+                    skippedCount++;
+                }
+                continue;
+            }
+
             const [existing] = await pool.query(
-                `SELECT id FROM Subjects WHERE code = ? AND type = ? AND is_active = TRUE AND ${gradeCheck}`,
-                [code, mappedType, ...gradeParams]
+                `SELECT id FROM Subjects WHERE code = ? AND name = ? AND type = ? AND is_active = TRUE AND ${gradeCheck}`,
+                [code, name.trim(), mappedType, ...gradeParams]
             );
             if ((existing as any[]).length > 0) { skippedCount++; continue; }
 
             const [inactive] = await pool.query(
-                `SELECT id FROM Subjects WHERE code = ? AND type = ? AND is_active = FALSE AND ${gradeCheck}`,
-                [code, mappedType, ...gradeParams]
+                `SELECT id FROM Subjects WHERE code = ? AND name = ? AND type = ? AND is_active = FALSE AND ${gradeCheck}`,
+                [code, name.trim(), mappedType, ...gradeParams]
             );
 
             if ((inactive as any[]).length > 0) {
